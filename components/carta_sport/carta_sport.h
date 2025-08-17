@@ -1,29 +1,46 @@
-import esphome.codegen as cg
-import esphome.config_validation as cv
-from esphome.components import ble_client
-from esphome.const import CONF_ID, CONF_MAC_ADDRESS
+#pragma once
 
-DEPENDENCIES = ["esp32", "ble_client", "esp32_ble_tracker"]
+#include "esphome/components/esp32_ble_tracker/esp32_ble_tracker.h"
+#include "esphome/core/component.h"
+#include "esphome/core/log.h"
 
-# Define the namespace for the carta_sport component
-carta_sport_ns = cg.esphome_ns.namespace("carta_sport")
+#ifdef USE_ESP32
 
-# Define the main component class
-CartaSportClient = carta_sport_ns.class_("CartaSportClient", cg.Component, ble_client.BLEClient)
+namespace esphome {
+namespace carta_sport {
 
-CONFIG_SCHEMA = cv.Schema({
-    cv.GenerateID(): cv.declare_id(CartaSportClient),
-    cv.Optional(CONF_MAC_ADDRESS): cv.mac_address,
-}).extend(cv.COMPONENT_SCHEMA).extend(ble_client.BLE_CLIENT_SCHEMA)
+// Focus V Carta Sport service UUID
+static const char *const CARTA_SPORT_SERVICE_UUID = "1011123e-8535-b5a0-7140-a304d2495cb7";
 
-async def to_code(config):
-    var = cg.new_Pvariable(config[CONF_ID])
-    await cg.register_component(var, config)
-    await ble_client.register_ble_client(var, config)
+class CartaSportDiscovery : public Component, public esp32_ble_tracker::ESPBTDeviceListener {
+ public:
+  void setup() override;
+  void loop() override;
+  void dump_config() override;
+  float get_setup_priority() const override { return setup_priority::AFTER_BLUETOOTH; }
 
-    # Set MAC address if provided
-    if CONF_MAC_ADDRESS in config:
-        cg.add(var.set_target_mac_address(config[CONF_MAC_ADDRESS].as_hex))
-    else:
-        # Set to empty to indicate we should scan for devices
-        cg.add(var.set_target_mac_address(""))
+  void set_target_mac_address(const std::string &mac) { this->target_mac_address_ = mac; }
+
+  bool parse_device(const esp32_ble_tracker::ESPBTDevice &device) override;
+
+  // Get the discovered MAC address (for use by other components)
+  std::string get_discovered_mac_address() const { return this->discovered_mac_; }
+  bool has_discovered_device() const { return !this->discovered_mac_.empty(); }
+
+ protected:
+  std::string target_mac_address_;
+  std::string discovered_mac_;
+  bool auto_connect_enabled_;
+  esp32_ble_tracker::ESPBTUUID carta_sport_service_uuid_;
+  uint32_t last_log_time_;
+
+  bool check_device_service_uuid_(const esp32_ble_tracker::ESPBTDevice &device);
+};
+
+// Global pointer for other components to access
+extern CartaSportDiscovery *global_carta_sport_discovery;
+
+}  // namespace carta_sport
+}  // namespace esphome
+
+#endif

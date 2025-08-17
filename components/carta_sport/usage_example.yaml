@@ -18,14 +18,24 @@ esp32_ble_tracker:
     window: 1000ms
     active: true
 
-# Auto-connect to first Carta Sport found
-carta_sport:
-  - id: my_carta_sport
+# Import from your GitHub repo
+external_components:
+  - source: github://yourusername/your-repo-name
+    components: [ carta_sport ]
 
-# Or connect to specific MAC address
-# carta_sport:
-#   - id: my_carta_sport
-#     mac_address: "AA:BB:CC:DD:EE:FF"
+# Discover Carta Sport devices
+carta_sport:
+  id: carta_discovery
+  # Optional: specify MAC address
+  # mac_address: "AA:BB:CC:DD:EE:FF"
+
+# Use regular BLE client with discovered/specified MAC
+ble_client:
+  - mac_address: "AA:BB:CC:DD:EE:FF"  # Replace with your device's MAC
+    id: my_carta_sport
+
+# Or if you want to use auto-discovery, you'll need to manually update
+# the MAC address once the discovery component finds it
 
 # Use with standard BLE client sensors
 sensor:
@@ -34,7 +44,27 @@ sensor:
     ble_client_id: my_carta_sport
     name: "Carta Sport Signal Strength"
 
+  # Example characteristic sensor (adjust UUIDs based on your device)
+  - platform: ble_client
+    type: characteristic
+    ble_client_id: my_carta_sport
+    name: "Carta Sport Battery"
+    service_uuid: "180F"
+    characteristic_uuid: "2A19"
+    unit_of_measurement: "%"
+
 binary_sensor:
   - platform: ble_client
     ble_client_id: my_carta_sport
     name: "Carta Sport Connected"
+
+# Text sensor to show discovered MAC address
+text_sensor:
+  - platform: template
+    name: "Discovered Carta Sport MAC"
+    lambda: |-
+      if (id(carta_discovery).has_discovered_device()) {
+        return id(carta_discovery).get_discovered_mac_address();
+      }
+      return {"Not found"};
+    update_interval: 10s

@@ -1,6 +1,5 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import ble_client
 from esphome.const import CONF_ID, CONF_MAC_ADDRESS
 
 DEPENDENCIES = ["esp32", "esp32_ble_tracker"]
@@ -9,17 +8,16 @@ DEPENDENCIES = ["esp32", "esp32_ble_tracker"]
 carta_sport_ns = cg.esphome_ns.namespace("carta_sport")
 
 # Define the main component class
-CartaSportClient = carta_sport_ns.class_("CartaSportClient", cg.Component, ble_client.BLEClient)
+CartaSportDiscovery = carta_sport_ns.class_("CartaSportDiscovery", cg.Component)
 
 CONFIG_SCHEMA = cv.Schema({
-    cv.GenerateID(): cv.declare_id(CartaSportClient),
+    cv.GenerateID(): cv.declare_id(CartaSportDiscovery),
     cv.Optional(CONF_MAC_ADDRESS): cv.mac_address,
-}).extend(cv.COMPONENT_SCHEMA).extend(ble_client.BLE_CLIENT_SCHEMA)
+}).extend(cv.COMPONENT_SCHEMA)
 
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
-    await ble_client.register_ble_client(var, config)
 
     # Set MAC address if provided
     if CONF_MAC_ADDRESS in config:
