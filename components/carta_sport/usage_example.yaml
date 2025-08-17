@@ -1,0 +1,40 @@
+esphome:
+  name: carta-sport-monitor
+  platform: ESP32
+  board: esp32dev
+
+logger:
+api:
+ota:
+
+wifi:
+  ssid: "your_wifi_ssid"
+  password: "your_wifi_password"
+
+# Required for BLE functionality
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 1100ms
+    window: 1000ms
+    active: true
+
+# Auto-connect to first Carta Sport found
+carta_sport:
+  - id: my_carta_sport
+
+# Or connect to specific MAC address
+# carta_sport:
+#   - id: my_carta_sport
+#     mac_address: "AA:BB:CC:DD:EE:FF"
+
+# Use with standard BLE client sensors
+sensor:
+  - platform: ble_client
+    type: rssi
+    ble_client_id: my_carta_sport
+    name: "Carta Sport Signal Strength"
+
+binary_sensor:
+  - platform: ble_client
+    ble_client_id: my_carta_sport
+    name: "Carta Sport Connected"
