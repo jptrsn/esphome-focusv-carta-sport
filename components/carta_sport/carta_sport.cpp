@@ -24,7 +24,7 @@ void CartaSportDiscovery::setup() {
   this->last_log_time_ = 0;
 
   // Register as a device listener
-  esp32_ble_tracker::global_esp32_ble_tracker->register_listener(this);
+  esp32_ble_tracker::esphome::esp32_ble_tracker::global_esp32_ble_tracker->register_listener(this);
 }
 
 void CartaSportDiscovery::loop() {
@@ -38,10 +38,10 @@ void CartaSportDiscovery::loop() {
   }
 
   if (this->connected_) {
-      // `global_esp32_ble_tracker->is_connected()` checks the last known status
+      // `esphome::esp32_ble_tracker::global_esp32_ble_tracker->is_connected()` checks the last known status
       bool still_connected = false;
-      if (global_esp32_ble_tracker) {
-          still_connected = global_esp32_ble_tracker->is_connected(this->device_address_);
+      if (esphome::esp32_ble_tracker::global_esp32_ble_tracker) {
+          still_connected = esphome::esp32_ble_tracker::global_esp32_ble_tracker->is_connected(this->device_address_);
       }
 
       if (!still_connected) {
@@ -49,9 +49,9 @@ void CartaSportDiscovery::loop() {
           this->reset_connection();
 
           // Restart BLE discovery so we can find the device again
-          if (global_esp32_ble_tracker) {
+          if (esphome::esp32_ble_tracker::global_esp32_ble_tracker) {
               ESP_LOGD(TAG, "Restarting BLE discovery");
-              global_esp32_ble_tracker->start_discovering();
+              esphome::esp32_ble_tracker::global_esp32_ble_tracker->start_discovering();
           }
       }
   }
@@ -85,9 +85,9 @@ bool CartaSportDiscovery::parse_device(const esp32_ble_tracker::ESPBTDevice &dev
       this->discovered_mac_ = device.address_str();
 
       // Stop the global BLE scanner
-      if (global_esp32_ble_tracker != nullptr) {
+      if (esphome::esp32_ble_tracker::global_esp32_ble_tracker != nullptr) {
         ESP_LOGD(TAG, "Stopping BLE discovery");
-        global_esp32_ble_tracker->stop_discovering();
+        esphome::esp32_ble_tracker::global_esp32_ble_tracker->stop_discovering();
       }
 
       // Store device name for template access
@@ -150,7 +150,7 @@ bool CartaSportDiscovery::check_device_service_uuid_(const esp32_ble_tracker::ES
 }
 
 void CartaSportDiscovery::try_connect(const esp32_ble_tracker::ESPBTDevice &device) {
-  if (!global_esp32_ble_tracker) {
+  if (!esphome::esp32_ble_tracker::global_esp32_ble_tracker) {
     ESP_LOGE(TAG, "No BLE tracker available");
     return;
   }
@@ -159,7 +159,7 @@ void CartaSportDiscovery::try_connect(const esp32_ble_tracker::ESPBTDevice &devi
   ESP_LOGI(TAG, "Attempting connection to %s", device.address_str().c_str());
 
   // `connect_to_device` returns a bool but we can ignore it for now
-  global_esp32_ble_tracker->connect_to_device(device, /*reconnect=*/true);
+  esphome::esp32_ble_tracker::global_esp32_ble_tracker->connect_to_device(device, /*reconnect=*/true);
 
   // The ESPBTDevice will set a callback on disconnect, so we can set the flag here.
   // For ESPHome, the device becomes connected immediately after this call
