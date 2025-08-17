@@ -15,8 +15,9 @@ void CartaSportDiscovery::setup() {
 
   global_carta_sport_discovery = this;
 
-  // Initialize the Carta Sport service UUID
-  this->carta_sport_service_uuid_ = esp32_ble_tracker::ESPBTUUID::from_uuid128_string(CARTA_SPORT_SERVICE_UUID);
+  // Initialize the Carta Sport service UUID - try different methods based on ESPHome version
+  auto uuid_str = std::string(CARTA_SPORT_SERVICE_UUID);
+  this->carta_sport_service_uuid_ = esp32_ble_tracker::ESPBTUUID::from_raw(uuid_str);
 
   // Set up auto-connect behavior based on whether MAC address is provided
   this->auto_connect_enabled_ = this->target_mac_address_.empty();
@@ -55,29 +56,6 @@ bool CartaSportDiscovery::parse_device(const esp32_ble_tracker::ESPBTDevice &dev
   if (!this->auto_connect_enabled_) {
     if (device.address_str() != this->target_mac_address_) {
       return false;
-}
-
-void CartaSportDeviceNameSensor::setup() {
-  ESP_LOGCONFIG(TAG, "Setting up Carta Sport Device Name Sensor...");
-}
-
-void CartaSportDeviceNameSensor::dump_config() {
-  ESP_LOGCONFIG(TAG, "Carta Sport Device Name Sensor");
-  LOG_TEXT_SENSOR("", "Device Name", this);
-}
-
-void CartaSportDeviceNameSensor::update_device_name(const std::string &name) {
-  if (this->state != name) {
-    ESP_LOGD(TAG, "Device name updated: %s", name.c_str());
-    this->publish_state(name);
-  }
-}
-
-void CartaSportDeviceNameSensor::clear_device_name() {
-  if (!this->state.empty()) {
-    ESP_LOGD(TAG, "Device name cleared");
-    this->publish_state("");
-  }
     }
   }
 
@@ -103,11 +81,22 @@ void CartaSportDeviceNameSensor::clear_device_name() {
 
 bool CartaSportDiscovery::check_device_service_uuid_(const esp32_ble_tracker::ESPBTDevice &device) {
   // Check if the device advertises the Carta Sport service UUID
-  for (auto &service_uuid : device.get_service_uuids()) {
+  // First check the service data
+  auto service_datas = device.get_service_datas();
+  for (auto &data : service_datas) {
+    if (data.uuid == this->carta_sport_service_uuid_) {
+      return true;
+    }
+  }
+
+  // Then check advertised services
+  auto service_uuids = device.get_service_uuids();
+  for (auto &service_uuid : service_uuids) {
     if (service_uuid == this->carta_sport_service_uuid_) {
       return true;
     }
   }
+
   return false;
 }
 
