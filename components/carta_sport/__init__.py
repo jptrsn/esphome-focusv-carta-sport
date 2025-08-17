@@ -3,7 +3,7 @@ import esphome.config_validation as cv
 from esphome.components import ble_client
 from esphome.const import CONF_ID, CONF_MAC_ADDRESS
 
-DEPENDENCIES = ["esp32", "ble_client", "esp32_ble_tracker"]
+DEPENDENCIES = ["esp32", "esp32_ble_tracker"]
 
 # Define the namespace for the carta_sport component
 carta_sport_ns = cg.esphome_ns.namespace("carta_sport")
