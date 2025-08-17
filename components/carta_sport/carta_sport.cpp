@@ -80,19 +80,39 @@ bool CartaSportDiscovery::parse_device(const esp32_ble_tracker::ESPBTDevice &dev
 }
 
 bool CartaSportDiscovery::check_device_service_uuid_(const esp32_ble_tracker::ESPBTDevice &device) {
-  // Check if the device advertises the Carta Sport service UUID
-  // First check the service data
-  auto service_datas = device.get_service_datas();
-  for (auto &data : service_datas) {
-    if (data.uuid == this->carta_sport_service_uuid_) {
+  // Method 1: Check device name pattern
+  std::string device_name = device.get_name();
+  if (!device_name.empty()) {
+    // Look for "CARTA SPORT" in the device name
+    if (device_name.find("CARTA SPORT") != std::string::npos) {
+      ESP_LOGD(TAG, "Found device by name pattern: %s", device_name.c_str());
       return true;
     }
   }
 
-  // Then check advertised services
+  // Method 2: Check manufacturer specific data
+  auto manufacturer_datas = device.get_manufacturer_datas();
+  for (auto &data : manufacturer_datas) {
+    // Carta Sport manufacturer ID is 0x0211 (529 decimal)
+    if (data.uuid.get_uuid().uuid16 == 0x0211) {
+      ESP_LOGD(TAG, "Found device by manufacturer ID: 0x0211");
+      return true;
+    }
+  }
+
+  // Method 3: Original service UUID check (keep as fallback)
+  auto service_datas = device.get_service_datas();
+  for (auto &data : service_datas) {
+    if (data.uuid == this->carta_sport_service_uuid_) {
+      ESP_LOGD(TAG, "Found device by service UUID");
+      return true;
+    }
+  }
+
   auto service_uuids = device.get_service_uuids();
   for (auto &service_uuid : service_uuids) {
     if (service_uuid == this->carta_sport_service_uuid_) {
+      ESP_LOGD(TAG, "Found device by advertised service UUID");
       return true;
     }
   }
