@@ -94,7 +94,7 @@ bool CartaSportDiscovery::check_device_service_uuid_(const esp32_ble_tracker::ES
   auto manufacturer_datas = device.get_manufacturer_datas();
   for (auto &data : manufacturer_datas) {
     // Carta Sport manufacturer ID is 0x0211 (529 decimal)
-    if (data.uuid.get_uuid().uuid16 == 0x0211) {
+    if (data.uuid == esp32_ble_tracker::ESPBTUUID::from_uint32(0x0211))
       ESP_LOGD(TAG, "Found device by manufacturer ID: 0x0211");
       return true;
     }
