@@ -30,3 +30,7 @@ async def to_code(config):
     else:
         # Set to empty to indicate we should scan for devices
         cg.add(var.set_target_mac_address(""))
+
+    # expose the connected flag for templates
+    cg.add_define("CARTA_SPORT_HAVE_CONNECTED", True)
+    # In YAML you can now use: {{ carta_sport.is_connected }} as a template

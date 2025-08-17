@@ -24,11 +24,21 @@ class CartaSportDiscovery : public Component, public esp32_ble_tracker::ESPBTDev
   // Get the discovered device name (for use in templates)
   std::string get_discovered_device_name() const { return this->discovered_device_name_; }
 
+  // Get device connection status
+  bool is_connected() const { return connected_; }
+  std::string get_connected_mac() const { return device_address_; }
+
   bool parse_device(const esp32_ble_tracker::ESPBTDevice &device) override;
 
   // Get the discovered MAC address (for use by other components)
   std::string get_discovered_mac_address() const { return this->discovered_mac_; }
   bool has_discovered_device() const { return !this->discovered_mac_.empty(); }
+
+  // Reset the state of the connected device
+  void reset_connection() {
+    this->connected_ = false;
+    this->device_address_.clear();
+  }
 
  protected:
   std::string target_mac_address_;
@@ -37,6 +47,8 @@ class CartaSportDiscovery : public Component, public esp32_ble_tracker::ESPBTDev
   bool auto_connect_enabled_;
   esp32_ble_tracker::ESPBTUUID carta_sport_service_uuid_;
   uint32_t last_log_time_;
+  bool connected_ = false;                     // true when we are connected
+  std::string device_address_ = "";            // address we are connected to
 
   bool check_device_service_uuid_(const esp32_ble_tracker::ESPBTDevice &device);
 };
