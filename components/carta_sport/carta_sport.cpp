@@ -16,7 +16,7 @@ void CartaSportDiscovery::setup() {
   global_carta_sport_discovery = this;
 
   // Initialize the Carta Sport service UUID
-  this->carta_sport_service_uuid_ = esp32_ble_tracker::ESPBTUUID::from_string(CARTA_SPORT_SERVICE_UUID);
+  this->carta_sport_service_uuid_ = esp32_ble_tracker::ESPBTUUID::from_uuid128_string(CARTA_SPORT_SERVICE_UUID);
 
   // Set up auto-connect behavior based on whether MAC address is provided
   this->auto_connect_enabled_ = this->target_mac_address_.empty();
@@ -104,7 +104,7 @@ void CartaSportDeviceNameSensor::clear_device_name() {
 bool CartaSportDiscovery::check_device_service_uuid_(const esp32_ble_tracker::ESPBTDevice &device) {
   // Check if the device advertises the Carta Sport service UUID
   for (auto &service_uuid : device.get_service_uuids()) {
-    if (service_uuid.contains(this->carta_sport_service_uuid_)) {
+    if (service_uuid == this->carta_sport_service_uuid_) {
       return true;
     }
   }
