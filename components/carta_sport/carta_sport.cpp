@@ -55,6 +55,29 @@ bool CartaSportDiscovery::parse_device(const esp32_ble_tracker::ESPBTDevice &dev
   if (!this->auto_connect_enabled_) {
     if (device.address_str() != this->target_mac_address_) {
       return false;
+}
+
+void CartaSportDeviceNameSensor::setup() {
+  ESP_LOGCONFIG(TAG, "Setting up Carta Sport Device Name Sensor...");
+}
+
+void CartaSportDeviceNameSensor::dump_config() {
+  ESP_LOGCONFIG(TAG, "Carta Sport Device Name Sensor");
+  LOG_TEXT_SENSOR("", "Device Name", this);
+}
+
+void CartaSportDeviceNameSensor::update_device_name(const std::string &name) {
+  if (this->state != name) {
+    ESP_LOGD(TAG, "Device name updated: %s", name.c_str());
+    this->publish_state(name);
+  }
+}
+
+void CartaSportDeviceNameSensor::clear_device_name() {
+  if (!this->state.empty()) {
+    ESP_LOGD(TAG, "Device name cleared");
+    this->publish_state("");
+  }
     }
   }
 
@@ -63,6 +86,15 @@ bool CartaSportDiscovery::parse_device(const esp32_ble_tracker::ESPBTDevice &dev
     if (this->discovered_mac_ != device.address_str()) {
       ESP_LOGI(TAG, "Discovered Carta Sport device: %s", device.address_str().c_str());
       this->discovered_mac_ = device.address_str();
+
+      // Update device name sensor if available
+      if (this->device_name_sensor_ != nullptr) {
+        std::string device_name = device.get_name();
+        if (device_name.empty()) {
+          device_name = "Unknown Carta Sport";
+        }
+        this->device_name_sensor_->update_device_name(device_name);
+      }
     }
     return true;
   }

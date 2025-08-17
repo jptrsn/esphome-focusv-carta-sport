@@ -23,11 +23,16 @@ external_components:
   - source: github://yourusername/your-repo-name
     components: [ carta_sport ]
 
-# Discover Carta Sport devices
+# Discover Carta Sport devices with device name sensor
 carta_sport:
   id: carta_discovery
   # Optional: specify MAC address
   # mac_address: "AA:BB:CC:DD:EE:FF"
+
+  # Device name sensor - automatically populated when device is discovered
+  device_name:
+    name: "Carta Sport Device Name"
+    id: carta_device_name
 
 # Use regular BLE client with discovered/specified MAC
 ble_client:
@@ -68,3 +73,6 @@ text_sensor:
       }
       return {"Not found"};
     update_interval: 10s
+
+  # The device name sensor is automatically created above in carta_sport config
+  # No need to define it separately - it will show the actual device name
