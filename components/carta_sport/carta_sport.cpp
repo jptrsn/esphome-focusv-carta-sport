@@ -87,14 +87,13 @@ void CartaSportDeviceNameSensor::clear_device_name() {
       ESP_LOGI(TAG, "Discovered Carta Sport device: %s", device.address_str().c_str());
       this->discovered_mac_ = device.address_str();
 
-      // Update device name sensor if available
-      if (this->device_name_sensor_ != nullptr) {
-        std::string device_name = device.get_name();
-        if (device_name.empty()) {
-          device_name = "Unknown Carta Sport";
-        }
-        this->device_name_sensor_->update_device_name(device_name);
+      // Store device name for template access
+      std::string device_name = device.get_name();
+      if (device_name.empty()) {
+        device_name = "Unknown Carta Sport";
       }
+      this->discovered_device_name_ = device_name;
+      ESP_LOGI(TAG, "Device name: %s", device_name.c_str());
     }
     return true;
   }
