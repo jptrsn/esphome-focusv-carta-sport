@@ -18,9 +18,6 @@ void CartaSportComponent::setup() {
   this->device_name_char_uuid_obj_ = esp32_ble_tracker::ESPBTUUID::from_string(STANDARD_DEVICE_NAME_CHAR_UUID);
   this->temperature_char_uuid_obj_ = esp32_ble_tracker::ESPBTUUID::from_string(CARTA_SPORT_CHAR1_UUID);
   this->battery_char_uuid_obj_ = esp32_ble_tracker::ESPBTUUID::from_string(STANDARD_BATTERY_CHAR_UUID);
-
-  // Set the device address for connection
-  this->set_address(this->address_);
 }
 
 void CartaSportComponent::loop() {
@@ -44,7 +41,6 @@ void CartaSportComponent::update() {
 
 void CartaSportComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Carta Sport:");
-  ESP_LOGCONFIG(TAG, "  MAC Address: %s", format_hex(this->address_).c_str());
   ESP_LOGCONFIG(TAG, "  Carta Service UUID: %s", CARTA_SPORT_SERVICE_UUID);
   ESP_LOGCONFIG(TAG, "  Secondary Service UUID: %s", CARTA_SPORT_SECONDARY_SERVICE_UUID);
   ESP_LOGCONFIG(TAG, "  Temperature Char UUID: %s", CARTA_SPORT_CHAR1_UUID);

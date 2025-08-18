@@ -23,8 +23,6 @@ class CartaSportComponent : public ble_client::BLEClientNode, public PollingComp
   void dump_config() override;
   float get_setup_priority() const override { return setup_priority::DATA; }
 
-  void set_address(uint64_t address) { this->address_ = address; }
-
   // Sensor setters
   void set_device_name_sensor(text_sensor::TextSensor *sensor) { this->device_name_sensor_ = sensor; }
   void set_temperature_sensor(sensor::Sensor *sensor) { this->temperature_sensor_ = sensor; }
@@ -32,8 +30,6 @@ class CartaSportComponent : public ble_client::BLEClientNode, public PollingComp
   void set_rssi_sensor(sensor::Sensor *sensor) { this->rssi_sensor_ = sensor; }
 
  protected:
-  uint64_t address_;
-
   text_sensor::TextSensor *device_name_sensor_{nullptr};
   sensor::Sensor *temperature_sensor_{nullptr};
   sensor::Sensor *battery_sensor_{nullptr};

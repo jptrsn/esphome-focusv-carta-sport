@@ -16,11 +16,10 @@ CartaSportComponent = carta_sport_ns.class_(
 )
 
 # Simple configuration - all UUIDs are now hard-coded in constants.h
-CONFIG_SCHEMA = (
+CONFIG_SCHEMA = cv.All(
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(CartaSportComponent),
-            cv.Required(CONF_MAC_ADDRESS): cv.mac_address,
             cv.Optional(CONF_UPDATE_INTERVAL, default="30s"): cv.update_interval,
         }
     )
@@ -33,5 +32,3 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     await ble_client.register_ble_node(var, config)
-
-    cg.add(var.set_address(config[CONF_MAC_ADDRESS].as_hex))
