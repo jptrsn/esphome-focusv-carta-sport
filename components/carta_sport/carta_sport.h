@@ -6,6 +6,7 @@
 #include "esphome/components/esp32_ble_tracker/esp32_ble_tracker.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
+#include "constants.h"
 
 #ifdef USE_ESP32
 
@@ -23,11 +24,6 @@ class CartaSportComponent : public ble_client::BLEClientNode, public PollingComp
   float get_setup_priority() const override { return setup_priority::DATA; }
 
   void set_address(uint64_t address) { this->address_ = address; }
-  void set_carta_service_uuid(const std::string &uuid) { this->carta_service_uuid_ = uuid; }
-  void set_secondary_service_uuid(const std::string &uuid) { this->secondary_service_uuid_ = uuid; }
-  void set_device_name_char_uuid(const std::string &uuid) { this->device_name_char_uuid_ = uuid; }
-  void set_temperature_char_uuid(const std::string &uuid) { this->temperature_char_uuid_ = uuid; }
-  void set_battery_char_uuid(const std::string &uuid) { this->battery_char_uuid_ = uuid; }
 
   // Sensor setters
   void set_device_name_sensor(text_sensor::TextSensor *sensor) { this->device_name_sensor_ = sensor; }
@@ -37,11 +33,6 @@ class CartaSportComponent : public ble_client::BLEClientNode, public PollingComp
 
  protected:
   uint64_t address_;
-  std::string carta_service_uuid_;
-  std::string secondary_service_uuid_;
-  std::string device_name_char_uuid_;
-  std::string temperature_char_uuid_;
-  std::string battery_char_uuid_;
 
   text_sensor::TextSensor *device_name_sensor_{nullptr};
   sensor::Sensor *temperature_sensor_{nullptr};
@@ -49,6 +40,8 @@ class CartaSportComponent : public ble_client::BLEClientNode, public PollingComp
   sensor::Sensor *rssi_sensor_{nullptr};
 
   bool connected_{false};
+
+  // UUID objects - initialized in setup() using constants
   esp32_ble_tracker::ESPBTUUID carta_service_uuid_obj_;
   esp32_ble_tracker::ESPBTUUID secondary_service_uuid_obj_;
   esp32_ble_tracker::ESPBTUUID device_name_char_uuid_obj_;
@@ -68,7 +61,7 @@ class CartaSportComponent : public ble_client::BLEClientNode, public PollingComp
   // Service handles
   uint16_t carta_service_handle_{0};
   uint16_t secondary_service_handle_{0};
-  uint16_t gap_service_handle_{0};  // Generic Access Profile service
+  uint16_t gap_service_handle_{0};
   uint16_t battery_service_handle_{0};
 
   // Characteristic handles

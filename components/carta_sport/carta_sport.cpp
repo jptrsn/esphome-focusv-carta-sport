@@ -12,12 +12,12 @@ static const char *const TAG = "carta_sport";
 void CartaSportComponent::setup() {
   ESP_LOGCONFIG(TAG, "Setting up Carta Sport...");
 
-  // Convert string UUIDs to ESPBTUUID objects
-  this->carta_service_uuid_obj_ = esp32_ble_tracker::ESPBTUUID::from_string(this->carta_service_uuid_);
-  this->secondary_service_uuid_obj_ = esp32_ble_tracker::ESPBTUUID::from_string(this->secondary_service_uuid_);
-  this->device_name_char_uuid_obj_ = esp32_ble_tracker::ESPBTUUID::from_string(this->device_name_char_uuid_);
-  this->temperature_char_uuid_obj_ = esp32_ble_tracker::ESPBTUUID::from_string(this->temperature_char_uuid_);
-  this->battery_char_uuid_obj_ = esp32_ble_tracker::ESPBTUUID::from_string(this->battery_char_uuid_);
+  // Initialize UUID objects using hard-coded constants
+  this->carta_service_uuid_obj_ = esp32_ble_tracker::ESPBTUUID::from_string(CARTA_SPORT_SERVICE_UUID);
+  this->secondary_service_uuid_obj_ = esp32_ble_tracker::ESPBTUUID::from_string(CARTA_SPORT_SECONDARY_SERVICE_UUID);
+  this->device_name_char_uuid_obj_ = esp32_ble_tracker::ESPBTUUID::from_string(STANDARD_DEVICE_NAME_CHAR_UUID);
+  this->temperature_char_uuid_obj_ = esp32_ble_tracker::ESPBTUUID::from_string(CARTA_SPORT_CHAR1_UUID);
+  this->battery_char_uuid_obj_ = esp32_ble_tracker::ESPBTUUID::from_string(STANDARD_BATTERY_CHAR_UUID);
 
   // Set the device address for connection
   this->set_address(this->address_);
@@ -45,11 +45,11 @@ void CartaSportComponent::update() {
 void CartaSportComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Carta Sport:");
   ESP_LOGCONFIG(TAG, "  MAC Address: %s", format_hex(this->address_).c_str());
-  ESP_LOGCONFIG(TAG, "  Carta Service UUID: %s", this->carta_service_uuid_.c_str());
-  ESP_LOGCONFIG(TAG, "  Secondary Service UUID: %s", this->secondary_service_uuid_.c_str());
-  ESP_LOGCONFIG(TAG, "  Device Name Char: %s", this->device_name_char_uuid_.c_str());
-  ESP_LOGCONFIG(TAG, "  Temperature Char: %s", this->temperature_char_uuid_.c_str());
-  ESP_LOGCONFIG(TAG, "  Battery Char: %s", this->battery_char_uuid_.c_str());
+  ESP_LOGCONFIG(TAG, "  Carta Service UUID: %s", CARTA_SPORT_SERVICE_UUID);
+  ESP_LOGCONFIG(TAG, "  Secondary Service UUID: %s", CARTA_SPORT_SECONDARY_SERVICE_UUID);
+  ESP_LOGCONFIG(TAG, "  Temperature Char UUID: %s", CARTA_SPORT_CHAR1_UUID);
+  ESP_LOGCONFIG(TAG, "  Battery Char UUID: %s", STANDARD_BATTERY_CHAR_UUID);
+  ESP_LOGCONFIG(TAG, "  Device Name Char UUID: %s", STANDARD_DEVICE_NAME_CHAR_UUID);
   LOG_UPDATE_INTERVAL(this);
 }
 
@@ -196,11 +196,41 @@ void CartaSportComponent::handle_device_name_read_(const uint8_t *data, uint16_t
 
 void CartaSportComponent::handle_temperature_read_(const uint8_t *data, uint16_t length) {
   if (this->temperature_sensor_ != nullptr && data != nullptr && length >= 2) {
-    // Assuming temperature is sent as 2-byte integer (adjust based on actual protocol)
-    uint16_t temp_raw = (data[1] << 8) | data[0];
-    float temperature = temp_raw / 100.0f;  // Adjust scaling as needed
-    ESP_LOGD(TAG, "Temperature: %.2f°C", temperature);
-    this->temperature_sensor_->publish_state(temperature);
+    // Log raw data for debugging
+    ESP_LOGD(TAG, "Temperature raw data (%d bytes): %s", length, format_hex_pretty(data, length).c_str());
+
+    // Try different parsing methods - adjust based on actual data format
+    float temperature = NAN;
+
+    if (length >= 4) {
+      // Try 32-bit float
+      float temp_float;
+      memcpy(&temp_float, data, sizeof(float));
+      if (!isnan(temp_float) && temp_float > -50 && temp_float < 500) {
+        temperature = temp_float;
+        ESP_LOGD(TAG, "Parsed as float: %.2f°C", temperature);
+      }
+    }
+
+    if (isnan(temperature) && length >= 2) {
+      // Try 16-bit integer with scaling
+      uint16_t temp_raw = (data[1] << 8) | data[0];  // Little endian
+      temperature = temp_raw / TEMPERATURE_SCALE_FACTOR;
+      ESP_LOGD(TAG, "Parsed as uint16 (LE): %d -> %.2f°C", temp_raw, temperature);
+    }
+
+    if (isnan(temperature) && length >= 2) {
+      // Try big endian
+      uint16_t temp_raw = (data[0] << 8) | data[1];
+      temperature = temp_raw / TEMPERATURE_SCALE_FACTOR;
+      ESP_LOGD(TAG, "Parsed as uint16 (BE): %d -> %.2f°C", temp_raw, temperature);
+    }
+
+    if (!isnan(temperature)) {
+      this->temperature_sensor_->publish_state(temperature);
+    } else {
+      ESP_LOGW(TAG, "Could not parse temperature data");
+    }
   }
 }
 
