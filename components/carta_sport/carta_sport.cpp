@@ -1,5 +1,6 @@
 #include "carta_sport.h"
 #include "esphome/core/log.h"
+#include "esphome/core/helpers.h"
 
 #ifdef USE_ESP32
 
@@ -8,164 +9,208 @@ namespace carta_sport {
 
 static const char *const TAG = "carta_sport";
 
-CartaSportDiscovery *global_carta_sport_discovery = nullptr;
+void CartaSportComponent::setup() {
+  ESP_LOGCONFIG(TAG, "Setting up Carta Sport...");
 
-void CartaSportDiscovery::setup() {
-  ESP_LOGCONFIG(TAG, "Setting up Focus V Carta Sport Discovery...");
+  // Convert string UUIDs to ESPBTUUID objects
+  this->carta_service_uuid_obj_ = esp32_ble_tracker::ESPBTUUID::from_string(this->carta_service_uuid_);
+  this->secondary_service_uuid_obj_ = esp32_ble_tracker::ESPBTUUID::from_string(this->secondary_service_uuid_);
+  this->device_name_char_uuid_obj_ = esp32_ble_tracker::ESPBTUUID::from_string(this->device_name_char_uuid_);
+  this->temperature_char_uuid_obj_ = esp32_ble_tracker::ESPBTUUID::from_string(this->temperature_char_uuid_);
+  this->battery_char_uuid_obj_ = esp32_ble_tracker::ESPBTUUID::from_string(this->battery_char_uuid_);
 
-  global_carta_sport_discovery = this;
-
-  // Initialize the Carta Sport service UUID - try different methods based on ESPHome version
-  auto uuid_str = std::string(CARTA_SPORT_SERVICE_UUID);
-  this->carta_sport_service_uuid_ = esp32_ble_tracker::ESPBTUUID::from_raw(uuid_str);
-
-  // Set up auto-connect behavior based on whether MAC address is provided
-  this->auto_connect_enabled_ = this->target_mac_address_.empty();
-  this->last_log_time_ = 0;
-
-  // Register as a device listener
-  esp32_ble_tracker::esphome::esp32_ble_tracker::global_esp32_ble_tracker->register_listener(this);
+  // Set the device address for connection
+  this->set_address(this->address_);
 }
 
-void CartaSportDiscovery::loop() {
-  // Periodically log discovery status
-  uint32_t now = millis();
-  if (now - this->last_log_time_ > 30000) {  // Every 30 seconds
-    if (this->auto_connect_enabled_ && this->discovered_mac_.empty()) {
-      ESP_LOGD(TAG, "Still scanning for Carta Sport devices...");
-    }
-    this->last_log_time_ = now;
-  }
+void CartaSportComponent::loop() {
+  // Handle connection state changes and other real-time processing
+}
 
-  if (this->connected_) {
-      // `esphome::esp32_ble_tracker::global_esp32_ble_tracker->is_connected()` checks the last known status
-      bool still_connected = false;
-      if (esphome::esp32_ble_tracker::global_esp32_ble_tracker) {
-          still_connected = esphome::esp32_ble_tracker::global_esp32_ble_tracker->is_connected(this->device_address_);
+void CartaSportComponent::update() {
+  if (this->connected_ && this->characteristics_found_) {
+    ESP_LOGD(TAG, "Updating Carta Sport sensors...");
+    this->read_device_characteristics_();
+
+    // Update RSSI
+    if (this->rssi_sensor_ != nullptr) {
+      int rssi = this->parent()->get_rssi();
+      if (rssi != 0) {
+        this->rssi_sensor_->publish_state(rssi);
+      }
+    }
+  }
+}
+
+void CartaSportComponent::dump_config() {
+  ESP_LOGCONFIG(TAG, "Carta Sport:");
+  ESP_LOGCONFIG(TAG, "  MAC Address: %s", format_hex(this->address_).c_str());
+  ESP_LOGCONFIG(TAG, "  Carta Service UUID: %s", this->carta_service_uuid_.c_str());
+  ESP_LOGCONFIG(TAG, "  Secondary Service UUID: %s", this->secondary_service_uuid_.c_str());
+  ESP_LOGCONFIG(TAG, "  Device Name Char: %s", this->device_name_char_uuid_.c_str());
+  ESP_LOGCONFIG(TAG, "  Temperature Char: %s", this->temperature_char_uuid_.c_str());
+  ESP_LOGCONFIG(TAG, "  Battery Char: %s", this->battery_char_uuid_.c_str());
+  LOG_UPDATE_INTERVAL(this);
+}
+
+void CartaSportComponent::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if,
+                                             esp_ble_gattc_cb_param_t *param) {
+  switch (event) {
+    case ESP_GATTC_OPEN_EVT: {
+      if (param->open.status == ESP_GATT_OK) {
+        ESP_LOGI(TAG, "Connected to Carta Sport device");
+        this->connected_ = true;
+      } else {
+        ESP_LOGW(TAG, "Failed to connect to Carta Sport device");
+        this->connected_ = false;
+      }
+      break;
+    }
+
+    case ESP_GATTC_DISCONNECT_EVT: {
+      ESP_LOGI(TAG, "Disconnected from Carta Sport device");
+      this->connected_ = false;
+      this->characteristics_found_ = false;
+      break;
+    }
+
+    case ESP_GATTC_SEARCH_CMPL_EVT: {
+      // Service discovery complete, now find characteristics
+      ESP_LOGD(TAG, "Service discovery complete");
+
+      // Find Carta Sport main service
+      auto *carta_srv = this->parent()->get_service(this->carta_service_uuid_obj_);
+      if (carta_srv != nullptr) {
+        this->carta_service_handle_ = carta_srv->handle;
+        ESP_LOGD(TAG, "Found Carta service at handle 0x%04X", carta_srv->handle);
+
+        // Look for temperature characteristic in main service
+        auto *temp_char = carta_srv->get_characteristic(this->temperature_char_uuid_obj_);
+        if (temp_char != nullptr) {
+          this->temperature_char_handle_ = temp_char->handle;
+          ESP_LOGD(TAG, "Found temperature char at handle 0x%04X", temp_char->handle);
+        }
       }
 
-      if (!still_connected) {
-          ESP_LOGW(TAG, "Lost connection to %s", this->device_address_.c_str());
-          this->reset_connection();
-
-          // Restart BLE discovery so we can find the device again
-          if (esphome::esp32_ble_tracker::global_esp32_ble_tracker) {
-              ESP_LOGD(TAG, "Restarting BLE discovery");
-              esphome::esp32_ble_tracker::global_esp32_ble_tracker->start_discovering();
-          }
-      }
-  }
-}
-
-void CartaSportDiscovery::dump_config() {
-  ESP_LOGCONFIG(TAG, "Focus V Carta Sport Discovery:");
-  ESP_LOGCONFIG(TAG, "  Service UUID: %s", CARTA_SPORT_SERVICE_UUID);
-  if (!this->auto_connect_enabled_) {
-    ESP_LOGCONFIG(TAG, "  Target MAC: %s", this->target_mac_address_.c_str());
-  } else {
-    ESP_LOGCONFIG(TAG, "  Auto-discovery: Enabled");
-  }
-  if (!this->discovered_mac_.empty()) {
-    ESP_LOGCONFIG(TAG, "  Discovered Device: %s", this->discovered_mac_.c_str());
-  }
-}
-
-bool CartaSportDiscovery::parse_device(const esp32_ble_tracker::ESPBTDevice &device) {
-  // If we have a specific MAC address target, only check that device
-  if (!this->auto_connect_enabled_) {
-    if (device.address_str() != this->target_mac_address_) {
-      return false;
-    }
-  }
-
-  // Check if this device has the Carta Sport service
-  if (this->check_device_service_uuid_(device)) {
-    if (this->discovered_mac_ != device.address_str()) {
-      ESP_LOGI(TAG, "Discovered Carta Sport device: %s", device.address_str().c_str());
-      this->discovered_mac_ = device.address_str();
-
-      // Stop the global BLE scanner
-      if (esphome::esp32_ble_tracker::global_esp32_ble_tracker != nullptr) {
-        ESP_LOGD(TAG, "Stopping BLE discovery");
-        esphome::esp32_ble_tracker::global_esp32_ble_tracker->stop_discovering();
+      // Find secondary service
+      auto *secondary_srv = this->parent()->get_service(this->secondary_service_uuid_obj_);
+      if (secondary_srv != nullptr) {
+        this->secondary_service_handle_ = secondary_srv->handle;
+        ESP_LOGD(TAG, "Found secondary service at handle 0x%04X", secondary_srv->handle);
       }
 
-      // Store device name for template access
-      std::string device_name = device.get_name();
-      if (device_name.empty()) {
-        device_name = "Unknown Carta Sport";
+      // Find standard GAP service for device name (handle 0x0001-0x0007 from logs)
+      esp32_ble_tracker::ESPBTUUID gap_service_uuid = esp32_ble_tracker::ESPBTUUID::from_uint16(0x1800);
+      auto *gap_srv = this->parent()->get_service(gap_service_uuid);
+      if (gap_srv != nullptr) {
+        this->gap_service_handle_ = gap_srv->handle;
+        auto *device_name_char = gap_srv->get_characteristic(this->device_name_char_uuid_obj_);
+        if (device_name_char != nullptr) {
+          this->device_name_char_handle_ = device_name_char->handle;
+          ESP_LOGD(TAG, "Found device name char at handle 0x%04X", device_name_char->handle);
+        }
       }
-      this->discovered_device_name_ = device_name;
-      ESP_LOGI(TAG, "Device name: %s", device_name.c_str());
-    }
-    // Attempt to connect if we aren't already
-    if (!this->connected_) {
-      this->try_connect(device);
-    }
-    return true;
-  }
 
-  return false;
+      // Find standard battery service (handle 0x0027 from logs)
+      esp32_ble_tracker::ESPBTUUID battery_service_uuid = esp32_ble_tracker::ESPBTUUID::from_uint16(0x180F);
+      auto *battery_srv = this->parent()->get_service(battery_service_uuid);
+      if (battery_srv != nullptr) {
+        this->battery_service_handle_ = battery_srv->handle;
+        auto *battery_char = battery_srv->get_characteristic(this->battery_char_uuid_obj_);
+        if (battery_char != nullptr) {
+          this->battery_char_handle_ = battery_char->handle;
+          ESP_LOGD(TAG, "Found battery char at handle 0x%04X", battery_char->handle);
+        }
+      }
+
+      this->characteristics_found_ = true;
+      ESP_LOGI(TAG, "Service discovery complete, device ready");
+      break;
+    }
+
+    case ESP_GATTC_READ_CHAR_EVT: {
+      if (param->read.status != ESP_GATT_OK) {
+        ESP_LOGW(TAG, "Error reading characteristic: %d", param->read.status);
+        break;
+      }
+
+      // Handle different characteristic reads
+      if (param->read.handle == this->device_name_char_handle_) {
+        this->handle_device_name_read_(param->read.value, param->read.value_len);
+      } else if (param->read.handle == this->temperature_char_handle_) {
+        this->handle_temperature_read_(param->read.value, param->read.value_len);
+      } else if (param->read.handle == this->battery_char_handle_) {
+        this->handle_battery_read_(param->read.value, param->read.value_len);
+      }
+      break;
+    }
+
+    default:
+      break;
+  }
 }
 
-bool CartaSportDiscovery::check_device_service_uuid_(const esp32_ble_tracker::ESPBTDevice &device) {
-  // Method 1: Check device name pattern
-  std::string device_name = device.get_name();
-  if (!device_name.empty()) {
-    // Look for "CARTA SPORT" in the device name
-    if (device_name.find("CARTA SPORT") != std::string::npos) {
-      ESP_LOGD(TAG, "Found device by name pattern: %s", device_name.c_str());
-      return true;
-    }
-  }
-
-  // Method 2: Check manufacturer specific data
-  auto manufacturer_datas = device.get_manufacturer_datas();
-  for (auto &data : manufacturer_datas) {
-    // Carta Sport manufacturer ID is 0x0211 (529 decimal)
-    if (data.uuid == esp32_ble_tracker::ESPBTUUID::from_uint32(0x0211)) {
-      ESP_LOGD(TAG, "Found device by manufacturer ID: 0x0211");
-      return true;
-    }
-  }
-
-  // Method 3: Original service UUID check (keep as fallback)
-  auto service_datas = device.get_service_datas();
-  for (auto &data : service_datas) {
-    if (data.uuid == this->carta_sport_service_uuid_) {
-      ESP_LOGD(TAG, "Found device by service UUID");
-      return true;
-    }
-  }
-
-  auto service_uuids = device.get_service_uuids();
-  for (auto &service_uuid : service_uuids) {
-    if (service_uuid == this->carta_sport_service_uuid_) {
-      ESP_LOGD(TAG, "Found device by advertised service UUID");
-      return true;
-    }
-  }
-
-  return false;
-}
-
-void CartaSportDiscovery::try_connect(const esp32_ble_tracker::ESPBTDevice &device) {
-  if (!esphome::esp32_ble_tracker::global_esp32_ble_tracker) {
-    ESP_LOGE(TAG, "No BLE tracker available");
+void CartaSportComponent::read_device_characteristics_() {
+  if (!this->connected_ || !this->characteristics_found_) {
     return;
   }
 
-  // ESP32 BLE Tracker handles the connection life‑cycle
-  ESP_LOGI(TAG, "Attempting connection to %s", device.address_str().c_str());
+  // Read device name
+  if (this->device_name_char_handle_ != 0 && this->device_name_sensor_ != nullptr) {
+    esp_err_t status = esp_ble_gattc_read_char(
+        this->parent()->get_gattc_if(), this->parent()->get_conn_id(),
+        this->device_name_char_handle_, ESP_GATT_AUTH_REQ_NONE);
+    if (status != ESP_OK) {
+      ESP_LOGW(TAG, "Failed to read device name characteristic");
+    }
+  }
 
-  // `connect_to_device` returns a bool but we can ignore it for now
-  esphome::esp32_ble_tracker::global_esp32_ble_tracker->connect_to_device(device, /*reconnect=*/true);
+  // Read temperature
+  if (this->temperature_char_handle_ != 0 && this->temperature_sensor_ != nullptr) {
+    esp_err_t status = esp_ble_gattc_read_char(
+        this->parent()->get_gattc_if(), this->parent()->get_conn_id(),
+        this->temperature_char_handle_, ESP_GATT_AUTH_REQ_NONE);
+    if (status != ESP_OK) {
+      ESP_LOGW(TAG, "Failed to read temperature characteristic");
+    }
+  }
 
-  // The ESPBTDevice will set a callback on disconnect, so we can set the flag here.
-  // For ESPHome, the device becomes connected immediately after this call
-  // (or after the next loop cycle).
-  this->connected_ = true;
-  this->device_address_ = device.address_str();
+  // Read battery
+  if (this->battery_char_handle_ != 0 && this->battery_sensor_ != nullptr) {
+    esp_err_t status = esp_ble_gattc_read_char(
+        this->parent()->get_gattc_if(), this->parent()->get_conn_id(),
+        this->battery_char_handle_, ESP_GATT_AUTH_REQ_NONE);
+    if (status != ESP_OK) {
+      ESP_LOGW(TAG, "Failed to read battery characteristic");
+    }
+  }
+}
+
+void CartaSportComponent::handle_device_name_read_(const uint8_t *data, uint16_t length) {
+  if (this->device_name_sensor_ != nullptr && data != nullptr && length > 0) {
+    std::string device_name((char*)data, length);
+    ESP_LOGD(TAG, "Device name: %s", device_name.c_str());
+    this->device_name_sensor_->publish_state(device_name);
+  }
+}
+
+void CartaSportComponent::handle_temperature_read_(const uint8_t *data, uint16_t length) {
+  if (this->temperature_sensor_ != nullptr && data != nullptr && length >= 2) {
+    // Assuming temperature is sent as 2-byte integer (adjust based on actual protocol)
+    uint16_t temp_raw = (data[1] << 8) | data[0];
+    float temperature = temp_raw / 100.0f;  // Adjust scaling as needed
+    ESP_LOGD(TAG, "Temperature: %.2f°C", temperature);
+    this->temperature_sensor_->publish_state(temperature);
+  }
+}
+
+void CartaSportComponent::handle_battery_read_(const uint8_t *data, uint16_t length) {
+  if (this->battery_sensor_ != nullptr && data != nullptr && length >= 1) {
+    // Assuming battery level is a single byte percentage
+    uint8_t battery_level = data[0];
+    ESP_LOGD(TAG, "Battery level: %d%%", battery_level);
+    this->battery_sensor_->publish_state(battery_level);
+  }
 }
 
 }  // namespace carta_sport
